@@ -1,22 +1,16 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 
+import pendulum
 from airflow import DAG
 from airflow.operators.bash_operator import BashOperator
-from airflow.utils.dates import days_ago
 
-# [END import_module]
-
-# [START default_args]
-# These args will get passed on to each operator
-# You can override them on a per-task basis during operator initialization
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
-    'start_date': days_ago(0),
     'email': ['ax66@@bk.com'],
     'email_on_failure': True,
     'email_on_retry': True,
-    'retries': 1,
+    'retries': 0,
     'retry_delay': timedelta(minutes=5),
     # 'queue': 'bash_queue',
     # 'pool': 'backfill',
@@ -32,13 +26,17 @@ default_args = {
     # 'sla_miss_callback': yet_another_function,
     # 'trigger_rule': 'all_success'
 }
+schedule_interval = timedelta(days=1)
+start_date = datetime.now(tz=pendulum.timezone('Europe/Moscow')).replace(hour=6, minute=0) - schedule_interval
 
-dag = DAG('crawler',
+dag = DAG('avito_crawler',
           catchup=False,
           default_args=default_args,
-          description='crawler',
-          schedule_interval='0 5 * * *',
-          tags=['test'],
+          description='avito_crawler',
+          tags=['avito_crawler'],
+          schedule_interval=schedule_interval,
+          start_date=start_date,
+
           )
 t1 = BashOperator(
     task_id='run_igoods',
