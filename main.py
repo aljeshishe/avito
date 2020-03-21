@@ -2,56 +2,32 @@ import email
 import json
 import logging
 import os
+import re
+import string
+import time
 from pathlib import Path
 from contextlib import contextmanager, closing
 from datetime import datetime
-
+from lxml.etree import tostring
 from lxml import html
 import requests
-
+from lxml.html import Element, HtmlElement
 
 log = logging.getLogger(__name__)
 
-shops = dict(metro='''Host: igooods.ru
-User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
-Accept-Language: en-US,en;q=0.5
-Accept-Encoding: gzip, deflate
-Connection: keep-alive
-Cookie: _igooods_session_cross_domain=K3JsY2RFTWFIbE5CdUkwZU92dzVscE9HZzJNRGp5Lzh6NXFPRENTckpsQlMvRUJ3d3o2MlZWYVFlVVFMNFdyNVJ0ZjdhbzFCUElKTVVadzZpV3JWeHpObllCSHJualB2bjdHVEtINlNFRzVvbEx0Y3ZxNW9RbVlYV1FvOG4vLzNPdjIrTmJXTVFFaEVNWmRvVXJQckZQczdHMWRGUUp5UFh6UHNiZUtoYWo2UkI4d2EraTdiM2h3aWJUblo3a1U1VVZPa2E4OU1rSVBmSlZTTVA3QXNLV004Zm5OaXhuT1d4OVI0cVNsaWNHZ2lQUjFaZXBCK0FkSW85MGlvNGlpVHNYMlYrTUFuZ3BZOVBpcllLZjZ5Snc9PS0tOHBpNC9hTktrUDhEVlFZRklRcVRHQT09--bc63f30bb0e38ac3094766d78cf249a65806eb4d; ref=products_main; sa_current_city_cross_domain=%D0%A1%D0%B0%D0%BD%D0%BA%D1%82-%D0%9F%D0%B5%D1%82%D0%B5%D1%80%D0%B1%D1%83%D1%80%D0%B3
-Upgrade-Insecure-Requests: 1
-Pragma: no-cache
-Cache-Control: no-cache''',
-             prisma='''Host: igooods.ru
-User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0
+
+headers = '''Host: www.avito.ru
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:74.0) Gecko/20100101 Firefox/74.0
 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
 Accept-Language: en-US,en;q=0.5
 Accept-Encoding: gzip, deflate, br
 Connection: keep-alive
-Cookie: _igooods_session_cross_domain=cFFoVDlMSllsNmlkQmdEWit1VWV5N2pISkdGT3NkcVZqeDhiOEZNZW10UVhPaGpxOUMwblhEcnZHbldEL2tYaURuNmNUcFhuOXcrWCt0T2NGQXF2TEc4UkhkWjdIME1IOHpmT0ppNTNXNzgyQkpyUHRZWTdVYmdtMFh6NHlhMXNrY2gzczQvM3JhZVpCcXpyZHFXTlhSbjQwNGZKNVU5N1FPNUJsUU1SVytEODNlQ29Oa2xoUEJwcURoSzh2ZEc0cVlMVkZOQ0lLQ1JlWjdVbjRJK29VaDBxV0JEOTVVdFdCVGdldnV4aXNrZzB3bVFRb2dVZU9jRUZZb3hQNDhhUVpIMVpPS2FwQnVmemhkM1ZWaVhSZ0E9PS0tVnk4TzRkUzBQREJiTGtpUmd0MksyQT09--6606b9d7bf839d9e124cb14c03f635ff2cde7f70; ref=products_main; sa_current_city_cross_domain=%D0%A1%D0%B0%D0%BD%D0%BA%D1%82-%D0%9F%D0%B5%D1%82%D0%B5%D1%80%D0%B1%D1%83%D1%80%D0%B3; ya_metrica_view_select_address=true; ga_view_select_address=true
+Cookie: u=2k0y1l0n.1eo4fm.gd1ui33z9z; v=1584795471; buyer_location_id=653240; luri=sankt-peterburg; sx=H4sIAAAAAAACA52V0ZKiMBBF%2F8XnfWgwQGf%2FRqJEaCVIA%2B24Nf%2B%2BN1vl7DiPllVSlslJp2%2Ffy59dW59pnHzDloIzdppi4JiMdr%2F%2F7Lbd790UzpdySV6r4JhYoolLMZE5JxJp92t32v0uKnbMhaf9569dS8dxEGXZRAMBSS5wYOYn8kK1mjZdLJRwWiJOLIEtRGbseEGyr4E8%2BVq78jRSIRYloAh2KaCQt6osGcgqzueibJjaGMEKIZKZw%2B4n0j9kkRTn6QoYOYqqOJwZK0N09op0%2BeKH4bAdDoJTLZqLSjg%2BctL3kDUBWc5La3zRsS0ZXRQLliiFGJ9IuXd9v9IwnYMFl9tpQRmHGtou%2FANZ5F665NPhUcZJJZil6MSpULQn0s2X%2BxL7SW8SU6KQFAvAU8wHk7wimyxPmORSNuNjf1cN2AK1Xcw9%2BFL8%2BhH6wa9jzZiyQJnqkuQClJ17RbLLF%2B9v%2Fq7Dw8U6oLxkSUg0mr6BLCufL34cpzT3i5Xoe8JiDEku1vitKr3PQ9T6cNrWbr2nCCVjJIay%2Bn8uo9x0uBbTx11wVgoKjSh7IYbstO%2FI2pcNkI2%2FJT9cVrvHrDfnOpIJf8lTLJNBrdu8sCSMNzRCf5giwUXxRfGy%2BVdle7VbuwmVGqOCqAoPYZO%2BgdzvqzzqlbU2L6GbO4YNnRkldNO9U2RFdRa8WJchbYzcUMiDPIApWFj1PWSVZ6hdt86Xug4bZE5ZcQww0uGJPNp47VN7Pw8BMWG4CQYNjk24kIj7oU4JZN0us936rlcRgnHxME3o5hPZ3ZN%2F6HZePpK6nCzCGCJGwHAk%2FU5EK7PDm3I6rvvtOCN8kJlJKUCj%2BD%2BA%2B2PXNsMUP85G%2BAQsiwH9hoIKn31HNlTnaPPz4dHe5tBWYoKZxKwhM7H1iWyMbsiMw%2BGAMLGEEGBCFGEdfqr%2BQGbvVKe1q05TPXjN1oZ%2F2Am%2Bv1p5nWyty7P1R1PYBQkVXEryb85goxdksc9VtkUl13PT%2BhEJLYSXhKIWPL5aSW0ry%2BLtxnAUxhb%2F4tXkkEPu58WLKldZ7pu70PLYPjDq2YaIrZyDX70ch%2FGk50t%2FxH3BcqT5bQEyQluie5Wn2H9%2B%2FgXVy9QKIQcAAA%3D%3D; dfp_group=37; sessid=406371494d15aa1f66766d2e978c7cff.1584795474; __cfduid=d224628d008c0077fb8ca09f612d672961584795476; buyer_tooltip_location=653240; no-ssr=1; f=5.0c4f4b6d233fb90636b4dd61b04726f147e1eada7172e06c47e1eada7172e06c47e1eada7172e06c47e1eada7172e06cb59320d6eb6303c1b59320d6eb6303c1b59320d6eb6303c147e1eada7172e06c8a38e2c5b3e08b898a38e2c5b3e08b890df103df0c26013a7b0d53c7afc06d0b2ebf3cb6fd35a0ac7b0d53c7afc06d0b8b1472fe2f9ba6b9c7f279391b0a3959c7cea19ce9ef44010f7bd04ea141548c71e7cb57bbcb8e0f2da10fb74cac1eab2da10fb74cac1eab2da10fb74cac1eab2da10fb74cac1eab2da10fb74cac1eab2da10fb74cac1eab2da10fb74cac1eab2da10fb74cac1eab2da10fb74cac1eab2da10fb74cac1eab2da10fb74cac1eab2da10fb74cac1eab2da10fb74cac1eab868aff1d7654931c9d8e6ff57b051a58d53a34211e148d88b0a8b49ec157ab29938bf52c98d70e5c6d2582a4fb5550e930b016c035941205d21ab7cd585086e0b86f1b8aaa5acad607ce30aedaa83a5d343076c04c14cfd09d9b2ff8011cc827cbf1a5019b899285ad09145d3e31a5690839cf02ea7744fc8db57d0f7c7638d471e7cb57bbcb8e0fd1d953d27484fd81666d5156b5a01ea6; _nfh=66f342aeb8b39d20d1a7234c825e4599; so=1584801930
 Upgrade-Insecure-Requests: 1
 Pragma: no-cache
-Cache-Control: no-cache''',
-             lenta='''Host: igooods.ru
-User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
-Accept-Language: en-US,en;q=0.5
-Accept-Encoding: gzip, deflate
-Connection: keep-alive
-Cookie: _igooods_session_cross_domain=ZVZCTmtla3BmcGFBWW9keEoweThRdUVYOU5SalI2VjNaS1RCKzB4SkRDZy9uVnJVaWRJYzZDM3ZrcWJtamFsT1ZieHJKNUJaU2t5K1hjcEdDeG9MMm9xd1pKY3pHS2hhaTdqRFVrbEhyNm50SGRIZFN0dTR3c0RWQlNOUWFEWFlMTkhqU3pKbUNFK3lyNThaMEJ1OEZOaG9WVFpJN0VPeWorV2crNGpXdlBHTUlPWFFsYUFZNEx3N0pPYTdMNzhjWlhrUnhxSTZvZDlOSnJxcEVqVno4VHo0Z0VlSnhFT0E0aXFReVp6eWlNYU5rU2ZWaTRFQ01KQzN3My91VHoyR1F6YjhHam1SNnFmQndGak1aUHltdWc9PS0tN0dqMDJINm1IbDVWckg4TEtVMC9wZz09--da3c4e170d10f06bab0dc4d823f881a6010b9bdf; ref=products_main; sa_current_city_cross_domain=%D0%A1%D0%B0%D0%BD%D0%BA%D1%82-%D0%9F%D0%B5%D1%82%D0%B5%D1%80%D0%B1%D1%83%D1%80%D0%B3; ga_view_select_address=true
-Upgrade-Insecure-Requests: 1
-Pragma: no-cache
-Cache-Control: no-cache''',
-             karusel='''Host: igooods.ru
-User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
-Accept-Language: en-US,en;q=0.5
-Accept-Encoding: gzip, deflate, br
-Connection: keep-alive
-Cookie: _igooods_session_cross_domain=d3pwUUdadG1UVmtjN3drdHk1NklLbGt4WENMUU1iSkEvT3BFWERSY3dKSW5Oa0hNWFJaK2ltU2c1c3NmdEZUamJaWDZmR2xLTDFrWUpFSlp3ZFNZaDQvckJidFVOSUFLYXZjYlVJRDFPZ2FDc05oWVgzYVVCWmhxZzJTNlJiejBYalduTEZSVXU0ZVhaNzYzaGdyQjRTYXFFcTJxdmlJRlZZTzMzVVNmdFBZcGpzd2JUSHhEb1VqcUZyM3hWR2FsbDArWndxNzJHNk9uWUtJOFpOdklnZE1jRVd3aFhPc1lVazd3N29mT1pFZFh5eWdVOUtQVDNrZzBQWmRCOWd5ejRma1kwODhmZklEbVVxRjhmZmZ5b2c9PS0tRFpvbUt0c1EyRkVUdHkwYzVrNkRZUT09--cbeee7ed1db38e41522ff261b1e55a6e50569c1f; ref=products_main; sa_current_city_cross_domain=%D0%A1%D0%B0%D0%BD%D0%BA%D1%82-%D0%9F%D0%B5%D1%82%D0%B5%D1%80%D0%B1%D1%83%D1%80%D0%B3; ya_metrica_view_select_address=true; ga_view_select_address=true; last_seen_products=[]
-Upgrade-Insecure-Requests: 1
-Pragma: no-cache
-Cache-Control: no-cache''')
+Cache-Control: no-cache
+TE: Trailers'''
+headers = email.message_from_string(headers)
 
 
 @contextmanager
@@ -67,47 +43,91 @@ def context(verbose=True, **kwargs):
         log.exception(f'Exception while processing {kwargs_str}')
 
 
-def save(name, response):
-    with open(name, 'w', encoding=response.encoding) as f:
-        f.write(response.text)
-
-
-def get(url, headers, shop=None):
+def get(url, headers):
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     return response
 
 
-def parse(response):
-    return html.fromstring(response.content, parser=html.HTMLParser(encoding='utf-8'))
+def parse(self):
+    return html.fromstring(self.content, parser=html.HTMLParser(encoding='utf-8'))
 
 
-def process(on_result, shop, headers):
-    response = get('https://igooods.ru/products', headers)
-    assert f'{shop}-selected' in response.text
-    categories = parse(response).xpath('//div[@class="b-side-menu__item small with-children"]/a[@data-category-id]/@data-category-id')
-    log.info(f'Processing categories {" ".join(categories)}')
-    for cat in sorted(categories):
-        with context(shop=shop, cat=cat):
-            url = 'https://igooods.ru/products?category_id={cat}&from_category=true&page={page}&q[by]=letter&q[order]=asc'
-            tree = parse(get(url.format(cat=cat, page=1), headers=headers, shop=shop))
-            pages = int(tree.xpath('//div[@data-total-pages]/@data-total-pages')[0])
-            for page in range(1, pages):
-                # if page == 2: return
-                tree = parse(get(url=url.format(cat=cat, page=page), headers=headers))
-                products = tree.xpath('//div[@class="b-product-small-card"]')
+requests.Response.parse = parse
 
-                for product in products:
-                    with context(verbose=False, shop=shop, cat=cat, page=page, product=product):
-                        attrib = product.xpath('.//div[@class="g-cart-action small"]')[0].attrib
-                        del attrib['class']
-                        data = dict(attrib)
-                        a_tag = product.xpath('.//a[@class="with-ellipsis name js-link-to-popup"]')[0]
-                        data['shop'] = shop
-                        data['cat'] = cat
-                        data['name'] = a_tag.text
-                        data['url'] = a_tag.attrib['href']
-                        on_result.send(data)
+requests.Response._old_raise_for_status = requests.Response.raise_for_status
+
+
+def raise_for_status(self):
+    self._old_raise_for_status()
+    return self
+
+
+requests.Response.raise_for_status = raise_for_status
+
+
+def save(self):
+    name = self.url.split('/')[-1] + '.html'
+    valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
+    name = ''.join(c for c in name if c in valid_chars)
+    with open(name, 'w', encoding=self.encoding) as f:
+        f.write(self.text)
+    return self
+
+
+requests.Response.save = save
+
+
+def strip(s):
+    return s.strip()
+
+
+def parse(self, _path, method='text_content'):
+    t = self.xpath(_path)
+    if not t:
+        return None
+    t = t[0]
+    if method == 'text_content':
+        t = t.text_content()
+    elif method==None:
+        t = t
+    return t.strip()
+
+
+HtmlElement.parse = parse
+
+
+def main(on_result):
+    host = 'https://www.avito.ru'
+    for page in range(1, 100):
+        # все квартиры 'sankt-peterburg/kvartiry?cd=1'
+        response = requests.get('{}/sankt-peterburg/kvartiry/sdam-ASgBAgICAUSSA8gQ?cd=1'.format(host), headers=headers)
+        # response = requests.get('https://www.avito.ru/sankt-peterburg/kvartiry/sdam-ASgBAgICAUSSA8gQ?s=1')
+        tree = response.raise_for_status().parse()
+        urls = tree.xpath('//a[@class="snippet-link js-snippet-link"]/@href')
+        for url in urls:
+            url = '{}/{}'.format(host, url)
+            with context(url=url):
+                time.sleep(1)
+                tree = requests.get(url, headers=headers).raise_for_status().parse()
+                data = dict(
+                    url=url,
+                    title=tree.parse('//span[@class="title-info-title-text"]'),
+                    posted_datetm=tree.parse('//*[@class="title-info-metadata-item-redesign"]'),
+                    sub_price=tree.parse('//*[@class="item-price-sub-price"]'),
+                    old_prise=tree.parse('//*[@class="item-price-old"]'),
+                    address=tree.parse('//span[@class="item-address__string"]'),
+                    text=tree.parse('//div[@itemprop="description"]'),
+                    views=tree.parse('//*[@class="title-info-metadata-item title-info-metadata-views"]'),
+                    seller_name=tree.parse('//div[@class="seller-info-name js-seller-info-name"]'),
+                    seller_url=tree.parse('//div[@class="seller-info-name js-seller-info-name"]/a/@href', method=None),
+                )
+                found = re.search('(\[.+\])', tree.parse('//script'))
+                if found:
+                    dicts = json.loads(found.group(0))
+                    data.update(dicts[0])
+                    data.update(dicts[1])
+                on_result.send(data)
 
 
 def result_writer(file_name):
@@ -146,7 +166,5 @@ if __name__ == '__main__':
     log.info('Started')
     with closing(result_writer(file_name=jsons_path / '{}.json'.format(now_str()))) as on_result:
         on_result.send(None)
-        for shop, headers in shops.items():
-            with context(shop=shop):
-                process(on_result, shop, email.message_from_string(headers))
+        main(on_result=on_result)
     log.info('Finished')
