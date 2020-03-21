@@ -1,0 +1,11 @@
+channels:
+- anaconda-fusion
+- defaults
+dependencies:
+- python==3.7
+- pip:
+  - click==7.0
+  - requests==2.23.0
+  - pyspark==2.4.5
+  - lxml==4.5.0
+  - apache-airflow==1.10.9

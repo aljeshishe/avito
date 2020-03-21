@@ -1,0 +1,36 @@
+version: '2.1'
+services:
+    webserver:
+        build:
+            context: .
+            dockerfile: ./Dockerfile
+            args:
+                buildno: 1
+        image: aljeshishe/airflow
+        restart: always
+        # depends_on:
+        environment:
+            - LOAD_EX=n
+        volumes:
+            - .:/app
+            - ./dags:/usr/local/airflow/dags
+            # Uncomment to include custom plugins
+            # - ./plugins:/usr/local/airflow/plugins
+        ports:
+            - "8080:8080"
+        command: webserver
+        healthcheck:
+            test: ["CMD-SHELL", "[ -f /usr/local/airflow/airflow-webserver.pid ]"]
+            interval: 30s
+            timeout: 30s
+            retries: 3
+
+    jupyter:
+        image: jupyter/pyspark-notebook
+        command: start-notebook.sh --NotebookApp.token='' --NotebookApp.password='' --port 8888
+        restart: always
+        # depends_on:
+        volumes:
+            - .:/home/jovyan
+        ports:
+            - "8888:8888"
