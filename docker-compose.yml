@@ -17,7 +17,7 @@ services:
             # Uncomment to include custom plugins
             # - ./plugins:/usr/local/airflow/plugins
         ports:
-            - "8081:8080"
+            - "28080:8080"
         command: webserver
         healthcheck:
             test: ["CMD-SHELL", "[ -f /usr/local/airflow/airflow-webserver.pid ]"]
@@ -33,4 +33,4 @@ services:
         volumes:
             - .:/home/jovyan
         ports:
-            - "8881:8888"
+            - "28888:8888"

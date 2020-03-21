@@ -33,10 +33,10 @@ default_args = {
     # 'trigger_rule': 'all_success'
 }
 
-dag = DAG('igoods',
+dag = DAG('crawler',
           catchup=False,
           default_args=default_args,
-          description='igoods crawler',
+          description='crawler',
           schedule_interval='0 5 * * *',
           tags=['test'],
           )
