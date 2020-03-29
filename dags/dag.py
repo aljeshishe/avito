@@ -27,7 +27,7 @@ default_args = {
     # 'trigger_rule': 'all_success'
 }
 schedule_interval = timedelta(days=1)
-start_date = datetime.now(tz=pendulum.timezone('Europe/Moscow')).replace(hour=6, minute=0) - schedule_interval
+start_date = datetime.now(tz=pendulum.timezone('Europe/Moscow')).replace(hour=6, minute=0, second=0) - schedule_interval
 
 dag = DAG('avito_crawler',
           catchup=False,
