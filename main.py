@@ -1,6 +1,7 @@
 import email
 import json
 import logging
+import logging.handlers
 import os
 import re
 import string
@@ -10,7 +11,7 @@ from contextlib import contextmanager, closing
 from datetime import datetime
 from lxml.etree import tostring
 from lxml import html
-import requests
+import prequests as requests
 from lxml.html import Element, HtmlElement
 
 log = logging.getLogger(__name__)
@@ -101,15 +102,17 @@ def main(on_result):
     host = 'https://www.avito.ru'
     for page in range(1, 100):
         # все квартиры 'sankt-peterburg/kvartiry?cd=1'
-        response = requests.get('{}/sankt-peterburg/kvartiry/sdam-ASgBAgICAUSSA8gQ?cd=1'.format(host), headers=headers)
+        response = requests.get('{}/sankt-peterburg/kvartiry/sdam-ASgBAgICAUSSA8gQ?cd=1'.format(host),
+                                headers=headers,
+                                retry_on=403)
         # response = requests.get('https://www.avito.ru/sankt-peterburg/kvartiry/sdam-ASgBAgICAUSSA8gQ?s=1')
         tree = response.raise_for_status().parse()
-        urls = tree.xpath('//a[@class="snippet-link js-snippet-link"]/@href')
+        urls = tree.xpath('//a[@class="snippet-link"]/@href')
         for url in urls:
             url = '{}/{}'.format(host, url)
             with context(url=url):
                 time.sleep(1)
-                tree = requests.get(url, headers=headers).raise_for_status().parse()
+                tree = requests.get(url, headers=headers, retry_on=403).raise_for_status().parse()
                 data = dict(
                     url=url,
                     title=tree.parse('//span[@class="title-info-title-text"]'),
@@ -151,11 +154,18 @@ def now_str():
 
 
 if __name__ == '__main__':
+    # requests.Proxies.instance(proxies=['68.183.180.179:8080'])
     jsons_path = Path('jsons')
     jsons_path.mkdir(parents=True, exist_ok=True)
     Path('logs').mkdir(parents=True, exist_ok=True)
     handler = logging.StreamHandler()
     handler.setLevel(logging.INFO)
+    logging.basicConfig(level=logging.DEBUG,
+                        format='%(asctime)s|%(levelname)-4.4s|%(thread)-6.6s|%(filename)-10.10s|%(funcName)-10.10s|%(message)s',
+                        handlers=[logging.StreamHandler(),
+                                  logging.handlers.RotatingFileHandler("log.log", maxBytes=200 * 1024 * 1024, backupCount=5)
+                                  ])
+
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s.%(msecs)03d|%(levelname)-4.4s|%(thread)-6.6s|%(funcName)-10.10s|%(message)s',
                         handlers=[logging.FileHandler('logs/food_{}.log'.format(now_str())),
