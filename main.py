@@ -162,13 +162,9 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s|%(levelname)-4.4s|%(thread)-6.6s|%(filename)-10.10s|%(funcName)-10.10s|%(message)s',
                         handlers=[logging.StreamHandler(),
-                                  logging.handlers.RotatingFileHandler("log.log", maxBytes=200 * 1024 * 1024, backupCount=5)
+                                  logging.handlers.RotatingFileHandler('logs/avito_{}.log'.format(now_str()), maxBytes=200 * 1024 * 1024, backupCount=5)
                                   ])
 
-    logging.basicConfig(level=logging.DEBUG,
-                        format='%(asctime)s.%(msecs)03d|%(levelname)-4.4s|%(thread)-6.6s|%(funcName)-10.10s|%(message)s',
-                        handlers=[logging.FileHandler('logs/avito_{}.log'.format(now_str())),
-                                  handler])
     logging.getLogger('requests').setLevel(logging.INFO)
     logging.getLogger('urllib3').setLevel(logging.INFO)
 
