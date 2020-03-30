@@ -111,7 +111,6 @@ def main(on_result):
         for url in urls:
             url = '{}/{}'.format(host, url)
             with context(url=url):
-                time.sleep(1)
                 tree = requests.get(url, headers=headers, retry_on=403).raise_for_status().parse()
                 data = dict(
                     url=url,
@@ -168,7 +167,7 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s.%(msecs)03d|%(levelname)-4.4s|%(thread)-6.6s|%(funcName)-10.10s|%(message)s',
-                        handlers=[logging.FileHandler('logs/food_{}.log'.format(now_str())),
+                        handlers=[logging.FileHandler('logs/avito_{}.log'.format(now_str())),
                                   handler])
     logging.getLogger('requests').setLevel(logging.INFO)
     logging.getLogger('urllib3').setLevel(logging.INFO)
