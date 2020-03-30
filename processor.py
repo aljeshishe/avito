@@ -1,5 +1,5 @@
 import traceback
-from queue import Queue
+from queue import Queue, Empty
 from threading import Thread
 import logging
 
@@ -9,9 +9,9 @@ class Processor:
     POISON_PILL = 'POISON_PILL'
 
     def __init__(self, threads=1):
-        self.results = []
         self.threads = []
         self.tasks = Queue()
+        self.running = True
         for i in range(threads):
             thread = Thread(target=self._thread_func)
             thread.start()
@@ -33,6 +33,8 @@ class Processor:
                 self.tasks.task_done()
 
     def add(self, task):
+        if not self.running:
+            return
         self.tasks.put(task)
 
     def wait_done(self):
@@ -40,8 +42,14 @@ class Processor:
         log.info('all done')
 
     def stop(self):
+        self.running = False
+        while True:
+            try:
+                self.tasks.get(block=False)
+            except Empty:
+                break
         for thread in self.threads:
-            self.add(self.POISON_PILL)
+            self.tasks.put(self.POISON_PILL)
 
         for thread in self.threads:
             thread.join()
