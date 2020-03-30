@@ -102,12 +102,11 @@ def main(on_result):
     host = 'https://www.avito.ru'
     for page in range(1, 100):
         # все квартиры 'sankt-peterburg/kvartiry?cd=1'
-        response = requests.get('{}/sankt-peterburg/kvartiry/sdam-ASgBAgICAUSSA8gQ?cd=1'.format(host),
+        response = requests.get(f'{host}/sankt-peterburg/kvartiry/sdam-ASgBAgICAUSSA8gQ?cd=1&p={page}',
                                 headers=headers,
                                 retry_on=403)
-        # response = requests.get('https://www.avito.ru/sankt-peterburg/kvartiry/sdam-ASgBAgICAUSSA8gQ?s=1')
         tree = response.raise_for_status().parse()
-        urls = tree.xpath('//a[@class="snippet-link"]/@href')
+        urls = tree.xpath('//a[@itemprop="url"]/@href')
         for url in urls:
             url = '{}/{}'.format(host, url)
             with context(url=url):
@@ -139,7 +138,7 @@ def result_writer(file_name):
         with open(temp_file_name, 'w', encoding='utf-8') as fp:
             while True:
                 data = yield
-                log.debug(' '.join(map(lambda i: f'{i[0]}:{i[1]}', data.items())))
+                # log.debug(' '.join(map(lambda i: f'{i[0]}:{i[1]}', data.items())))
                 data['datetm'] = str(datetime.now())
                 fp.write('{}\n'.format(json.dumps(data, ensure_ascii=False)))
                 fp.flush()
