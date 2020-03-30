@@ -6,6 +6,7 @@ import os
 import re
 import string
 import time
+from functools import partial
 from pathlib import Path
 from contextlib import contextmanager, closing
 from datetime import datetime
@@ -14,8 +15,9 @@ from lxml import html
 import prequests as requests
 from lxml.html import Element, HtmlElement
 
-log = logging.getLogger(__name__)
+from processor import Processor
 
+log = logging.getLogger(__name__)
 
 headers = '''Host: www.avito.ru
 User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:74.0) Gecko/20100101 Firefox/74.0
@@ -90,45 +92,54 @@ def parse(self, _path, method='text_content'):
     t = t[0]
     if method == 'text_content':
         t = t.text_content()
-    elif method==None:
+    elif method == None:
         t = t
     return t.strip()
 
 
 HtmlElement.parse = parse
+processor = Processor(10)
 
 
 def main(on_result):
     host = 'https://www.avito.ru'
     for page in range(1, 100):
         # все квартиры 'sankt-peterburg/kvartiry?cd=1'
-        response = requests.get(f'{host}/sankt-peterburg/kvartiry/sdam-ASgBAgICAUSSA8gQ?cd=1&p={page}',
-                                headers=headers,
-                                retry_on=403)
-        tree = response.raise_for_status().parse()
-        urls = tree.xpath('//a[@itemprop="url"]/@href')
-        for url in urls:
-            url = '{}/{}'.format(host, url)
-            with context(url=url):
-                tree = requests.get(url, headers=headers, retry_on=403).raise_for_status().parse()
-                data = dict(
-                    url=url,
-                    title=tree.parse('//span[@class="title-info-title-text"]'),
-                    posted_datetm=tree.parse('//*[@class="title-info-metadata-item-redesign"]'),
-                    sub_price=tree.parse('//*[@class="item-price-sub-price"]'),
-                    old_prise=tree.parse('//*[@class="item-price-old"]'),
-                    address=tree.parse('//span[@class="item-address__string"]'),
-                    text=tree.parse('//div[@itemprop="description"]'),
-                    views=tree.parse('//*[@class="title-info-metadata-item title-info-metadata-views"]'),
-                    seller_name=tree.parse('//div[@class="seller-info-name js-seller-info-name"]'),
-                    seller_url=tree.parse('//div[@class="seller-info-name js-seller-info-name"]/a/@href', method=None),
-                )
-                found = re.search('(\[.+\])', tree.parse('//script'))
-                if found:
-                    dicts = json.loads(found.group(0))
-                    data.update(dicts[0])
-                    data.update(dicts[1])
-                on_result.send(data)
+        processor.add(partial(on_page, host, on_result, page))
+
+
+def on_page(host, on_result, page):
+    response = requests.get(f'{host}/sankt-peterburg/kvartiry/sdam-ASgBAgICAUSSA8gQ?cd=1&p={page}',
+                            headers=headers,
+                            retry_on=403)
+    tree = response.raise_for_status().parse()
+    urls = tree.xpath('//a[@itemprop="url"]/@href')
+    for url in urls:
+        url = '{}/{}'.format(host, url)
+        processor.add(partial(on_url, on_result, url))
+
+
+def on_url(on_result, url):
+    with context(url=url):
+        tree = requests.get(url, headers=headers, retry_on=403).raise_for_status().parse()
+        data = dict(
+            url=url,
+            title=tree.parse('//span[@class="title-info-title-text"]'),
+            posted_datetm=tree.parse('//*[@class="title-info-metadata-item-redesign"]'),
+            sub_price=tree.parse('//*[@class="item-price-sub-price"]'),
+            old_prise=tree.parse('//*[@class="item-price-old"]'),
+            address=tree.parse('//span[@class="item-address__string"]'),
+            text=tree.parse('//div[@itemprop="description"]'),
+            views=tree.parse('//*[@class="title-info-metadata-item title-info-metadata-views"]'),
+            seller_name=tree.parse('//div[@class="seller-info-name js-seller-info-name"]'),
+            seller_url=tree.parse('//div[@class="seller-info-name js-seller-info-name"]/a/@href', method=None),
+        )
+        found = re.search('(\[.+\])', tree.parse('//script'))
+        if found:
+            dicts = json.loads(found.group(0))
+            data.update(dicts[0])
+            data.update(dicts[1])
+        on_result.send(data)
 
 
 def result_writer(file_name):
@@ -161,7 +172,8 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s|%(levelname)-4.4s|%(thread)-6.6s|%(filename)-10.10s|%(funcName)-10.10s|%(message)s',
                         handlers=[logging.StreamHandler(),
-                                  logging.handlers.RotatingFileHandler('logs/avito_{}.log'.format(now_str()), maxBytes=200 * 1024 * 1024, backupCount=5)
+                                  logging.handlers.RotatingFileHandler('logs/avito_{}.log'.format(now_str()),
+                                                                       maxBytes=200 * 1024 * 1024, backupCount=5)
                                   ])
 
     logging.getLogger('requests').setLevel(logging.INFO)
@@ -171,4 +183,6 @@ if __name__ == '__main__':
     with closing(result_writer(file_name=jsons_path / '{}.json'.format(now_str()))) as on_result:
         on_result.send(None)
         main(on_result=on_result)
+        processor.wait_done()
+        processor.stop()
     log.info('Finished')
