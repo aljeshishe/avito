@@ -14,11 +14,9 @@ services:
         volumes:
             - .:/app
             - ./dags:/usr/local/airflow/dags
-            - ./requirements.txt:/requirements.txt
+            # - ./requirements.txt:/requirements.txt
             # Uncomment to include custom plugins
             # - ./plugins:/usr/local/airflow/plugins
-        ports:
-            - "28080:8080"
         command: webserver
         healthcheck:
             test: ["CMD-SHELL", "[ -f /usr/local/airflow/airflow-webserver.pid ]"]
@@ -32,6 +30,4 @@ services:
         restart: always
         # depends_on:
         volumes:
-            - .:/home/jovyan
-        ports:
-            - "28888:8888"
+            - .:/home/jovyan/work
