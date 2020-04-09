@@ -98,7 +98,7 @@ def parse(self, _path, method='text_content'):
 
 
 HtmlElement.parse = parse
-processor = Processor(10)
+processor = Processor(50)
 retry_on = (content_has('временно ограничен'), content_has('Доступ временно заблокирован'))
 
 def main(on_result):
