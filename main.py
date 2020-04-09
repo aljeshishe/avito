@@ -98,12 +98,13 @@ def parse(self, _path, method='text_content'):
 
 
 HtmlElement.parse = parse
-processor = Processor(50)
+processor = Processor(100)
 retry_on = (content_has('временно ограничен'), content_has('Доступ временно заблокирован'))
+
 
 def main(on_result):
     host = 'https://www.avito.ru'
-    for page in range(1, 100):
+    for page in range(1, 50):
         # все квартиры 'sankt-peterburg/kvartiry?cd=1'
         processor.add(partial(on_page, host, on_result, page))
 
@@ -171,7 +172,7 @@ def now_str():
 
 
 if __name__ == '__main__':
-    requests.Proxies.instance()  # TODO prequests should request proxies, and all threads should wait till proxies received
+    # requests.Proxies.instance(throttling_interval)  # TODO prequests should request proxies, and all threads should wait till proxies received
     # requests.Proxies.instance(proxies=['68.183.180.179:8080'])
     jsons_path = Path('jsons')
     jsons_path.mkdir(parents=True, exist_ok=True)
