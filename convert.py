@@ -19,24 +19,27 @@ if __name__ == '__main__':
     spark = SparkSession.builder.getOrCreate()
     for file_name in list(glob.glob(str(parent_path / 'jsons' / '*.json'))):
         print(f'processing {file_name}')
+        if os.path.getsize(file_name) == 0:
+            print('File is empty, skipping')
+            continue
         df = spark.read.json(file_name)
         print(f'{df.count()} records read from json')
 
-        df = df.drop('data-group-quantity', 'data-energy-drink', 'data-amount', 'data-item-weight', 'data-energy-drink'). \
-            withColumn('old_price', df['data-old-price'].cast(FloatType())). \
-            withColumn('old_price_per_kg', df['data-old-price-per-kg'].cast(FloatType())). \
-            withColumn('price', df['data-price'].cast(FloatType())). \
-            withColumn('price_per_kg', df['data-price-per-kg'].cast(FloatType())). \
-            withColumn('product_id', df['data-product-id'].cast(IntegerType())). \
-            withColumn('type', df['data-type'].cast(StringType())). \
-            withColumn('weight', df['data-weight'].cast(IntegerType()))
-
-        calc_discount = round((1 - df.price / df.old_price) * 100, 2)
-
-        df = df.withColumn('discount', when(df.old_price.isNull(), None).otherwise(calc_discount)). \
-            select('shop', 'name', 'weight', 'price', 'old_price', 'price_per_kg',
-                   'old_price_per_kg', 'discount', 'cat', 'product_id', 'type', 'datetm', 'url')
-        df.sort('name').show(5)
+        # df = df.drop('data-group-quantity', 'data-energy-drink', 'data-amount', 'data-item-weight', 'data-energy-drink'). \
+        #     withColumn('old_price', df['data-old-price'].cast(FloatType())). \
+        #     withColumn('old_price_per_kg', df['data-old-price-per-kg'].cast(FloatType())). \
+        #     withColumn('price', df['data-price'].cast(FloatType())). \
+        #     withColumn('price_per_kg', df['data-price-per-kg'].cast(FloatType())). \
+        #     withColumn('product_id', df['data-product-id'].cast(IntegerType())). \
+        #     withColumn('type', df['data-type'].cast(StringType())). \
+        #     withColumn('weight', df['data-weight'].cast(IntegerType()))
+        #
+        # calc_discount = round((1 - df.price / df.old_price) * 100, 2)
+        #
+        # df = df.withColumn('discount', when(df.old_price.isNull(), None).otherwise(calc_discount)). \
+        #     select('shop', 'name', 'weight', 'price', 'old_price', 'price_per_kg',
+        #            'old_price_per_kg', 'discount', 'cat', 'product_id', 'type', 'datetm', 'url')
+        # df.sort('name').show(5)
 
         try:
             store = spark.read.parquet(store_name)
@@ -52,8 +55,9 @@ if __name__ == '__main__':
         u = store.union(df)
         print(f'{u.count()} records after union')
 
-        drop = u.withColumn('date', date_trunc('DAY', u.datetm)).dropDuplicates(['date', 'product_id', 'shop']).drop('date')
-        print(f'{drop.count()}(+{drop.count()-store_count}) records saving to store (after drop duplicates by date product_id)')
+        drop = u
+        # drop = u.withColumn('date', date_trunc('DAY', u.datetm)).dropDuplicates(['date', 'product_id', 'shop']).drop('date')
+        # print(f'{drop.count()}(+{drop.count()-store_count}) records saving to store (after drop duplicates by date product_id)')
 
 
         tmp_dir_name = '{}_tmp_{}{}'.format(store_name, datetime.now().strftime('%y_%d_%m__%H-%M-%S'),
