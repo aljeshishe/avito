@@ -100,7 +100,7 @@ def parse(self, _path, method='text_content'):
 HtmlElement.parse = parse
 processor = Processor(25)
 retry_on = (content_has('временно ограничен'), content_has('Доступ временно заблокирован'))
-
+now_datetm = datetime.now()
 
 def main(on_result):
     host = 'https://www.avito.ru'
@@ -159,7 +159,7 @@ def result_writer(file_name):
             while True:
                 data = yield
                 # log.debug(' '.join(map(lambda i: f'{i[0]}:{i[1]}', data.items())))
-                data['datetm'] = str(datetime.now())
+                data['crawl_datetm'] = str(now_datetm)
                 fp.write('{}\n'.format(json.dumps(data, ensure_ascii=False)))
                 fp.flush()
     except GeneratorExit:
@@ -167,13 +167,11 @@ def result_writer(file_name):
         os.rename(temp_file_name, file_name)
 
 
-def now_str():
-    return datetime.now().strftime('%y_%m_%d__%H_%M_%S')
 
 
 if __name__ == '__main__':
-    # requests.Proxies.instance(throttling_interval)  # TODO prequests should request proxies, and all threads should wait till proxies received
-    # requests.Proxies.instance(proxies=['68.183.180.179:8080'])
+    requests.Proxies.instance(throttling_interval_secs=10, temp_dir='stats')
+    now_str = datetime.now().strftime('%y_%m_%d__%H_%M_%S')
     jsons_path = Path('jsons')
     jsons_path.mkdir(parents=True, exist_ok=True)
     Path('logs').mkdir(parents=True, exist_ok=True)
@@ -182,7 +180,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s|%(levelname)-4.4s|%(thread)-6.6s|%(filename)-10.10s|%(funcName)-10.10s|%(message)s',
                         handlers=[logging.StreamHandler(),
-                                  logging.handlers.RotatingFileHandler('logs/avito_{}.log'.format(now_str()),
+                                  logging.handlers.RotatingFileHandler(f'logs/avito_{now_str}.log',
                                                                        maxBytes=200 * 1024 * 1024, backupCount=5)
                                   ])
 
@@ -190,7 +188,7 @@ if __name__ == '__main__':
     logging.getLogger('urllib3').setLevel(logging.INFO)
 
     log.info('Started')
-    with closing(result_writer(file_name=jsons_path / '{}.json'.format(now_str()))) as on_result:
+    with closing(result_writer(file_name=jsons_path / f'data_{now_str}.json')) as on_result:
         on_result.send(None)
         main(on_result=on_result)
         try:
