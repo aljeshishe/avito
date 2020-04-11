@@ -14,7 +14,7 @@ services:
         volumes:
             - .:/app
             - ./dags:/usr/local/airflow/dags
-            # - ./requirements.txt:/requirements.txt
+            - ./requirements.txt:/requirements.txt
             # Uncomment to include custom plugins
             # - ./plugins:/usr/local/airflow/plugins
         command: webserver
