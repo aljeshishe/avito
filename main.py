@@ -111,7 +111,6 @@ def main(on_result):
 
 def on_page(host, on_result, page):
     response = requests.get(f'{host}/sankt-peterburg/kvartiry/sdam-ASgBAgICAUSSA8gQ?cd=1&p={page}',
-                            headers=headers,
                             retry_on=retry_on)
     response.raise_for_status()
     tree = as_tree(response.content)
@@ -178,7 +177,7 @@ if __name__ == '__main__':
     handler = logging.StreamHandler()
     handler.setLevel(logging.INFO)
     logging.basicConfig(level=logging.DEBUG,
-                        format='%(asctime)s|%(levelname)-4.4s|%(thread)-6.6s|%(filename)-10.10s|%(funcName)-10.10s|%(message)s',
+                        format='%(asctime)s|%(levelname)-4.4s|%(thread)s|%(filename)-10.10s|%(funcName)-10.10s|%(message)s',
                         handlers=[logging.StreamHandler(),
                                   logging.handlers.RotatingFileHandler(f'logs/avito_{now_str}.log',
                                                                        maxBytes=200 * 1024 * 1024, backupCount=5)
