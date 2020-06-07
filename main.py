@@ -110,7 +110,7 @@ def main(on_result):
 
 
 def on_page(host, on_result, page):
-    response = requests.get(f'{host}/sankt-peterburg/kvartiry/sdam-ASgBAgICAUSSA8gQ?cd=1&p={page}',
+    response = requests.get(f'{host}//sankt-peterburg/kvartiry/sdam/na_dlitelnyy_srok-ASgBAgICAkSSA8gQ8AeQUg?cd=1&rn=25934&p={page}',
                             retry_on=retry_on)
     response.raise_for_status()
     tree = as_tree(response.content)
