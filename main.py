@@ -85,11 +85,11 @@ def strip(s):
     return s.strip()
 
 
-def parse(self, _path, method='text_content'):
+def parse(self, _path, method='text_content', idx=0):
     t = self.xpath(_path)
     if not t:
         return None
-    t = t[0]
+    t = t[idx]
     if method == 'text_content':
         t = t.text_content()
     elif method == None:
@@ -99,12 +99,12 @@ def parse(self, _path, method='text_content'):
 
 HtmlElement.parse = parse
 processor = Processor(25)
-retry_on = (content_has('временно ограничен'), content_has('Доступ временно заблокирован'))
+retry_on = (content_has('временно ограничен'), content_has('Доступ временно заблокирован'), content_has('Подождите, идет загрузка'))
 now_datetm = datetime.now()
 
 def main(on_result):
     host = 'https://www.avito.ru'
-    for page in range(1, 50):
+    for page in range(1, 3):
         # все квартиры 'sankt-peterburg/kvartiry?cd=1'
         processor.add(partial(on_page, host, on_result, page))
 
@@ -142,7 +142,7 @@ def on_content(content):
         seller_name=tree.parse('//div[@class="seller-info-name js-seller-info-name"]'),
         seller_url=tree.parse('//div[@class="seller-info-name js-seller-info-name"]/a/@href', method=None),
     )
-    found = re.search('(\[.+\])', tree.parse('//script'))
+    found = re.search('(\[.+\])', tree.parse('//script', idx=1))
     if found:
         dicts = json.loads(found.group(0))
         data.update(dicts[0])
