@@ -104,7 +104,7 @@ now_datetm = datetime.now()
 
 def main(on_result):
     host = 'https://www.avito.ru'
-    for page in range(1, 3):
+    for page in range(1, 50):
         # все квартиры 'sankt-peterburg/kvartiry?cd=1'
         processor.add(partial(on_page, host, on_result, page))
 
