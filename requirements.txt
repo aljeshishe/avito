@@ -1,4 +1,4 @@
 requests==2.23.0
 lxml==4.5.0
-apache-airflow==1.10.9
+apache-airflow==2.4.2
 -e git+https://github.com/aljeshishe/prequests.git@83d74771#egg=prequests
